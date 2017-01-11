@@ -250,3 +250,124 @@ __stop_legacy_networking () {
         local IFS=$oIFS
     fi
 }
+
+# random integer interface generator
+#   __random_integer e4 -> 2**4
+#   __random_integer e8 -> 2**8
+#   __random_integer e16 -> 2**16
+#   __random_integer e32 -> 2**32
+#   __random_integer -> 2**8
+__random_integer() {
+  local limit
+  case limit of
+    e4|16) __random_integer_e4;;
+    e8|256) __random_integer_e8;;
+    e16|65536) __random_integer_e16;;
+    e32|4294967296) __random_integer_e32;;
+    *) __random_integer e8;;
+  esac
+}
+
+# 4bits generator (0 -> 15)
+__random_integer_e4() {
+  local rand
+  rand=$(__random_integer_e8)
+  printf -- '%d\n' "$((rand%16))"
+}
+
+# 8bits generator (0 -> 255)
+__random_integer_e8() {
+  dd if=/dev/urandom bs=1 count=1 2>/dev/null
+   | od -tu1 \
+   | head -n1 \
+   | sed -E '1s/^.*(\ +)([0-9]+)(\ +)$/\2/'
+}
+
+# 16bits generator (0 -> 65535) 
+__random_integer_e16() {
+  dd if=/dev/urandom bs=2 count=1 2>/dev/null \
+   | od -tu2 \
+   | head -n1 \
+   | sed -E '1s/^.*(\ +)([0-9]+)(\ +)$/\2/'
+}
+
+# 32bits generator (0 -> 4294967295)
+__random_integer_e32() {
+  dd if=/dev/urandom bs=4 count=1 2>/dev/null \
+   | od -tu4 \
+   | head -n1 \
+   | sed -E '1s/^.*(\ +)([0-9]+)(\ +)$/\2/'
+}
+
+# random sequence generator
+#   mac generator:
+#     __random_sequence "6" "%x" "16" ":"
+#   ip4 generator:
+#     __random_sequence "4" "%d" "8" "."
+#   ip6 generator:
+#     __random_sequence "8" "%x" "16" ":"
+__random_sequence() {
+  local limit format size sep rand
+  for i in $(seq 0 ${length})
+  do
+    rand=$(__random_integer ${size})
+    printf -- "${format}%s" "${rand}" "${sep}"
+  done
+}
+
+__random_mac() {
+  __random_sequence 6 %x 16 :
+}
+
+__random_mac_private() {
+  printf -- '02:'
+  __random_sequence 5 %x 16 :
+}
+
+__random_ip4() {
+  __random_sequence "4" "%d" "8" "."
+}
+
+# __random_ip4_public() {}
+# __random_ip4_private() {}
+# __random_ip4_multicast() {}
+
+__random_ip6() {
+  __random_sequence "8" "%x" "16" ":"
+}
+
+# __random_ip6_anycast() {}
+# __random_ip6_multicast() {}
+# __random_ip6_private() {}
+
+__ifconfig_wrapper() {
+  local cmd
+  eval ifconfig ${cmd}
+}
+
+__netstat_wrapper() {
+}
+
+__create_epair() {
+  local ret
+  ret=$(ifconfig epair create)
+  echo ${ret} ${ret%a}b
+}
+
+__create_bridge() {
+  local ret
+  ret=$(ifconfig bridge create)
+  echo ${ret}
+}
+
+__create_vlan() {
+  local ret
+  ret=$(ifconfig vlan create)
+  echo ${ret}
+}
+
+__create_vxlan() {
+  local ret
+  ret=$(ifconfig vxlan create)
+  echo ${ret}
+}
