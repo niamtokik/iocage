@@ -297,6 +297,8 @@ __random_integer_e64() {
 
 ######################################################################
 # mac address support
+#  http://standards.ieee.org/develop/regauth/tut/macgrp.pdf
+#  /events/automotive/2014/18_Looming_Ethernet_MAC_Address_Crisis.pdf+
 ######################################################################
 __random_mac() {
   __random_mac48
@@ -382,8 +384,44 @@ __random_mac48_iana_unicast_unassigned_range4() {
   esac
 }
 
-__random_mac_private() {
-  printf -- '02:%s\n' $(jot -rs: -w%0.2x 5 0 255)
+__random_mac48_local_unicast() {
+  local _oui _id
+
+  # OUI part (2**6 value)
+  _oui=$(jot -r 1 0 63) 
+
+  # local bit (1) and multicast bit (0), add 2 after shift
+  _id=$(((_oui<<2)+2)) 
+  printf -- '%0.2x:%s\n' "${_id}" $(jot -rs: -w%0.2x 5 0 255)
+}
+
+__random_mac48_local_unicast_pair() {
+  local _mac _lbyte
+  _mac=$(__random_mac48_local_unicast | sed 's/:..$//')
+  _lbyte=$(jot -r 1 0 255)
+  printf -- '%s:%0.2x %s:%0.2x\n' \
+    ${_mac} ${_lbyte} \
+    ${_mac} $(((${_lbyte}+1)%255))
+}
+
+__random_mac48_local_multicast() {
+  local _oui _id
+
+  # OUI part (2**6 value)
+  _oui=$(jot -r 1 0 63) # OUI part (2**6 value)
+
+  # local bit set to 1 and multicast bit set to 1, add 3 after shift
+  _id=$(((_oui<<2)+3))
+  printf -- '%0.2x:%s\n' "${_id}" $(jot -rs: -w%0.2x 5 0 255)
+}
+
+__random_mac48_local_multicast_pair() {
+  local _mac _lbyte
+  _mac=$(__random_mac48_local_multicast | sed 's/:..$//')
+  _lbyte=$(jot -r 1 0 255)
+  printf -- '%s:%0.2x %s:%0.2x\n' \
+    ${_mac} ${_lbyte} \
+    ${_mac} $(((${_lbyte}+1)%255))
 }
 
 ######################################################################
@@ -475,7 +513,7 @@ __random_ip4_private_192() {
   printf -- '192.168.%s\n' $(jot -rs. -w%i 2 0 255)
 }
 
-__random_ip4_multicast() {}
+# __random_ip4_multicast() {}
 
 ######################################################################
 # ip6 address support
@@ -486,7 +524,12 @@ __random_ip6() {
 
 # __random_ip6_anycast() {}
 # __random_ip6_multicast() {}
-# __random_ip6_private() {}
+
+# https://www.rfc-editor.org/rfc/rfc4193.txt
+__random_ip6_private() {
+  printf -- "fd%0.2x:%s\n" $(jot -r 1 0 255) \
+            $(jot -rs: -w%0.2x 7 0 65535)
+}
 
 ######################################################################
 # command wrappers
@@ -496,8 +539,7 @@ __ifconfig_wrapper() {
   eval ifconfig ${cmd}
 }
 
-__netstat_wrapper() {
-}
+# __netstat_wrapper() { }
 
 __create_epair() {
   local ret
