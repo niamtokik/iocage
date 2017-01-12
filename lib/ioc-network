@@ -542,9 +542,71 @@ __ifconfig_wrapper() {
 # __netstat_wrapper() { }
 
 __create_epair() {
-  local ret
-  ret=$(ifconfig epair create)
-  echo ${ret} ${ret%a}b
+  local _ret _epair _mac_pair
+  #_ret=$(ifconfig epair create)
+  _ret="epair0a"
+  _epair="${_ret} ${_ret%a}b"
+  _mac_pair=$(__random_mac48_local_unicast_pair)
+  __zip_callback "${_epair}" "${_mac_pair}" __netif_mac_address
+  __zip_callback "${_epair}" "${_mac_pair}" __netif_description
+}
+
+__zip() {
+  __zip_callback "${1}" "${2}" echo
+}
+
+__zip_callback() {
+  local _a _b _counter _zip _callback
+  _a="${1}"
+  _b="${2}"
+  _callback="${3}"
+
+  if [ $(echo "${_a}"|wc -w) -ne $(echo "${_b}"|wc -w) ]
+  then
+    return 1
+  fi
+
+  while [ "${_a}" ] && [ "${_b}" ]
+  do
+    _zip=$(__head $_a)
+    _zip="${_zip} $(__head $_b)"
+    _a=$(__tail ${_a})
+    _b=$(__tail ${_b})
+    if [ "${_callback}" ]
+    then
+      eval ${_callback} ${_zip}
+    fi
+  done
+}
+
+__head() {
+  echo "${1}"
+}
+
+__tail() {
+  shift
+  echo "${*}"
+}
+
+__netif_mac_address () {
+  local _netif _mac
+  _netif=${1}
+  _mac=${2}
+  echo ifconfig "${_netif}" ether "${_mac}"
+}
+
+__netif_description() {
+  local _netif _description
+  _netif=${1}
+  _description=${2}
+  echo ifconfig "${_netif}" description "${_description}"
+}
+
+__netif_jail() {
+  local _netif _jail
+  _netif=${1}
+  _jail=${2}
+  echo ifconfig "${_netif}" vnet "${_jail}"
 }
 
 __create_bridge() {
