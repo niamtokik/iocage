@@ -626,3 +626,27 @@ __create_vxlan() {
   ret=$(ifconfig vxlan create)
   echo ${ret}
 }
+
+__connect_jails_with_epair() {
+  local _jails _epairs
+  _jails="${1} ${2}"
+  _epairs=$(__create_epair)
+  __zip_callback "${_jails}" "${_epairs}" __give_netif_to_jail
+}
+
+__give_netif_to_jail() {
+  local _netif _jail
+  _netif=${1}
+  _jail=${2}
+  ifconfig "${_netif}" vnet "${_jail}"
+}
+
+__connect_jail_bridge() {
+  local _bridge _jaila _jailb
+}
+__connect_jail_vlan() {
+  local _vlan _jail
+}
+__connect_jail_vxlan() {
+  local _vxlan _jail
+}
