@@ -259,7 +259,9 @@ __stop_legacy_networking () {
 #   __random_integer -> 2**8
 __random_integer() {
   local limit
-  case limit of
+  limit=${1}
+  case "${limit}"
+  in
     e4|16) __random_integer_e4;;
     e8|256) __random_integer_e8;;
     e16|65536) __random_integer_e16;;
@@ -268,78 +270,227 @@ __random_integer() {
   esac
 }
 
-# 4bits generator (0 -> 15)
+# 4bits decimal random number generator (0 -> 15)
 __random_integer_e4() {
-  local rand
-  rand=$(__random_integer_e8)
-  printf -- '%d\n' "$((rand%16))"
+  jot -r 1 0 15
 }
 
-# 8bits generator (0 -> 255)
+# 8bits decimal random number generator (0 -> 255)
 __random_integer_e8() {
-  dd if=/dev/urandom bs=1 count=1 2>/dev/null
-   | od -tu1 \
-   | head -n1 \
-   | sed -E '1s/^.*(\ +)([0-9]+)(\ +)$/\2/'
+  jot -r 1 0 255
 }
 
-# 16bits generator (0 -> 65535) 
+# 16bits decimal random number generator (0 -> 65535) 
 __random_integer_e16() {
-  dd if=/dev/urandom bs=2 count=1 2>/dev/null \
-   | od -tu2 \
-   | head -n1 \
-   | sed -E '1s/^.*(\ +)([0-9]+)(\ +)$/\2/'
+  jot -r 1 0 65535
 }
 
-# 32bits generator (0 -> 4294967295)
+# 32bits decimal random number generator (0 -> 4294967295)
 __random_integer_e32() {
-  dd if=/dev/urandom bs=4 count=1 2>/dev/null \
-   | od -tu4 \
-   | head -n1 \
-   | sed -E '1s/^.*(\ +)([0-9]+)(\ +)$/\2/'
+  jot -r 1 0 4294967295
 }
 
-# random sequence generator
-#   mac generator:
-#     __random_sequence "6" "%x" "16" ":"
-#   ip4 generator:
-#     __random_sequence "4" "%d" "8" "."
-#   ip6 generator:
-#     __random_sequence "8" "%x" "16" ":"
-__random_sequence() {
-  local limit format size sep rand
-  for i in $(seq 0 ${length})
-  do
-    rand=$(__random_integer ${size})
-    printf -- "${format}%s" "${rand}" "${sep}"
-  done
+# 64bits decimal random number generator (0 -> 18446744073709551615)
+__random_integer_e64() {
+  jot -r 1 0 18446744073709551615
 }
 
+######################################################################
+# mac address support
+######################################################################
 __random_mac() {
-  __random_sequence 6 %x 16 :
+  __random_mac48
+}
+
+__random_mac48() {
+  jot -r -s: -w%0.2x 6 0 255
+}
+
+__random_mac64() {
+  jot -r -s: -w%0.2x 8 0 255
+}
+
+# iana assignment see:
+#   https://www.iana.org/assignments/ethernet-numbers/
+__random_mac48_iana_unicast() {}
+
+__random_mac48_iana_unicast_vrrp4() {
+  printf -- '00:00:5e:00:01:%s\n' $(jot -rw%0.2x 1 0 255)
+}
+
+__random_mac48_iana_unicast_vrrp6() {
+  printf -- '00:00:5e:00:02:%s\n' $(jot -rw%0.2x 1 0 255)
+}
+
+__random_mac48_iana_unicast_packetetha() {
+  printf -- '00:00:5e:00:52:00\n'
+}
+
+__random_mac48_iana_unicast_packetethb() {
+  printf -- '00:00:5e:00:52:01\n'
+}
+
+__random_mac48_iana_unicast_proxymobile6() {}
+
+__random_mac48_iana_unicast_documentation() {}
+
+__random_mac48_iana_unicast_trill() {}
+
+__random_mac48_iana_unicast_unassigned() {
+  case $(jot -r 1 0 4) 
+  in
+    0) __random_mac48_iana_unicast_unassigned_range0;;
+    1) __random_mac48_iana_unicast_unassigned_range1;;
+    2) __random_mac48_iana_unicast_unassigned_range2;;
+    3) __random_mac48_iana_unicast_unassigned_range3;;
+    4) __random_mac48_iana_unicast_unassigned_range4;;
+  esac
+}
+
+__random_mac48_iana_unicast_unassigned_range0() {
+  printf -- '00:00:5e:00:%s:%s' \
+    $(jot -rw%0.2x 1 3 81) $(jot -rw%0.2x 1 0 255)
+}
+
+__random_mac48_iana_unicast_unassigned_range1() {
+  printf -- '00:00:5e:00:52:%s' $(jot -rw%0.2x 1 0 12)
+}
+
+__random_mac48_iana_unicast_unassigned_range2() {
+  local a
+  a=$(jot -rw%0.2x 1 0 144)
+  case ${a}
+  in
+    00) printf -- "00:00:5e:00:%s:%s" $(jot -rw%0.2x 1 84 255) \
+                  $(jot -rw%0.2x 0 255);;
+    *) printf -- "00:00:5e:%s:%s" ${a} $(jot -rs: -w%0.2x 2 0 255);;
+  esac
+}
+
+__random_mac48_iana_unicast_unassigned_range3() {
+  printf -- '00:00:5e:90:01:%s' $(jot -rw%0.2x 1 1 255)
+}
+
+__random_mac48_iana_unicast_unassigned_range4() {
+  local a
+  a=$(jot -rw%0.2x 1 144 255)
+  case ${a}
+  in
+    90) printf -- '00:00:5e:90:%s:%s' $(jot -rw%0.2x 1 2 255) \
+                  $(jot -rw%0.2x 1 0 255);;
+    *) printf -- '00:00:5e:%s:%s' ${a} $(jot -rs: -w%0.2x 2 0 255);;
+  esac
 }
 
 __random_mac_private() {
-  printf -- '02:'
-  __random_sequence 5 %x 16 :
+  printf -- '02:%s\n' $(jot -rs: -w%0.2x 5 0 255)
 }
 
+######################################################################
+# ip4 address support
+######################################################################
 __random_ip4() {
-  __random_sequence "4" "%d" "8" "."
+  jot -r -s: -w%i 4 0 255
 }
 
-# __random_ip4_public() {}
-# __random_ip4_private() {}
-# __random_ip4_multicast() {}
+__random_ip4_public() {
+  case $(jot -r 1 0 4)
+  in
+    0) __random_ip4_public_range0;;
+    1) __random_ip4_public_range1;;
+    2) __random_ip4_public_range2;;
+    3) __random_ip4_public_range3;;
+    4) __random_ip4_public_range4;;
+  esac
+  echo
+}
 
+# 0.0.0.0 -> 9.255.255.255
+__random_ip4_public_range0() {
+  printf -- '%s.%s' $(jot -r 1 0 9) $(jot -rs. 3 0 255)
+}
+
+# 11.0.0.0 -> 126.255.255.255
+__random_ip4_public_range1() {
+  printf -- '%s.%s' $(jot -r 1 11 126) $(jot -rs. 3 0 255)
+}
+
+# 128.0.0.0 -> 171.255.255.255
+__random_ip4_public_range2() {
+  printf -- '%s.%s' $(jot -r 1 128 171) $(jot -rs. 3 0 255)
+}
+
+# 172.32.0.0 -> 192.167.255.255
+__random_ip4_public_range3() {
+  local a
+  a=$(jot -r 1 172 192)
+  if [ ${a} -eq 172 ]
+  then
+    printf -- '%s.%s.%s' ${a} $(jot -r 1 32 255) $(jot -rs. 2 0 255)
+  elif [ ${a} -eq 192 ]
+  then
+    printf -- '%s.%s.%s' ${a} $(jot -r 1 0 167) $(jot -rs. 2 0 255)
+  else
+    printf -- '%s.%s' ${a} $(jot -rs. 3 0 255)
+  fi
+}
+
+# 192.169.0.0 -> 223.255.255.255
+__random_ip4_public_range4() {
+  local a
+  a=$(jot -r 1 192 223)
+  if [ ${a} -eq 192 ]
+  then
+    printf -- '%s.%s.%s' ${a} $(jot -r 1 169 255) $(jot -rs. 2 0 255)
+  else
+    printf -- '%s.%s' ${a} $(jot -rs. 3 0 255)
+  fi
+}
+
+__random_ip4_loopback() {
+  printf -- '127.%s\n' $(jot -rs. -w%i 3 0 255)
+}
+
+__random_ip4_private() {
+  case $(jot -r 1 0 2)
+  in
+    0) __random_ip4_private_10;;
+    1) __random_ip4_private_172;;
+    2) __random_ip4_private_192;;
+  esac
+}
+
+__random_ip4_private_10() {
+  printf -- '10.%s\n' $(jot -rs. -w%i 3 0 255)
+}
+
+__random_ip4_private_172() {
+  local first second
+  first=$(jot -rs. -w%i 1 0 31)
+  second=$(jot -rs. -w%i 2 0 255)
+  printf -- '172.%s.%s\n' "${first}" "${second}"
+}
+
+__random_ip4_private_192() {
+  printf -- '192.168.%s\n' $(jot -rs. -w%i 2 0 255)
+}
+
+__random_ip4_multicast() {}
+
+######################################################################
+# ip6 address support
+######################################################################
 __random_ip6() {
-  __random_sequence "8" "%x" "16" ":"
+  jot -rs: -w%0.4x 8 0 65535
 }
 
 # __random_ip6_anycast() {}
 # __random_ip6_multicast() {}
 # __random_ip6_private() {}
 
+######################################################################
+# command wrappers
+######################################################################
 __ifconfig_wrapper() {
   local cmd
   eval ifconfig ${cmd}
